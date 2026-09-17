@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>公文書ビューア（e-Gov XML） | 林材木店</title>
+<meta name="description" content="e-Gov・日本年金機構から届く公文書(XML＋XSL)のzipをそのまま放り込むと、ブラウザ内で通知書・返戻票を表示して印刷/PDF保存できるツール。ファイルは外部へ送信しません。">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f766e'/><text x='51' y='46.5' font-size='68' text-anchor='middle' dominant-baseline='central' fill='white' font-family='Meiryo,sans-serif' font-weight='700'>公</text></svg>">
+<link rel="apple-touch-icon" href="favicon.svg">
+<meta name="apple-mobile-web-app-title" content="公文書ビューア">
+<meta name="theme-color" content="#0f766e">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<script src="https://h02050d-ship-it.github.io/tool-portal/tu.js" defer></script>
+<style>
+:root{--ink:#1f2937;--sub:#6b7280;--line:#e5e7eb;--bg:#f5f7fa;--card:#fff;--teal:#0f766e;--teal2:#115e59;--tealbg:#ccfbf1;--red:#b91c1c;--redbg:#fee2e2;--amber:#b45309;--amberbg:#fef3c7;--green:#047857;--greenbg:#d1fae5}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Meiryo UI","Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--teal)}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:1100px;margin:0 auto;padding:12px 16px 60px}
+.hdr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 0 10px;border-bottom:2px solid var(--teal)}
+.logo{width:34px;height:34px;border-radius:8px;background:var(--teal);color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex:none}
+.hdr h1{font-size:19px;margin:0;font-weight:700}
+.hdr .meta{color:var(--sub);font-size:12.5px}
+.hdr .sp{flex:1}
+.btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 11px;font-size:13px;color:var(--ink)}
+.btn:hover{background:#f3f4f6}
+.btn.pri{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600}
+.btn.pri:hover{background:var(--teal2)}
+.btn:disabled{opacity:.45;cursor:default}
+#drop{margin:14px 0;border:2px dashed #99a3b3;border-radius:12px;background:#fff;padding:28px 18px;text-align:center;cursor:pointer;transition:.15s}
+#drop.over{border-color:var(--teal);background:var(--tealbg)}
+#drop .big{font-size:17px;font-weight:700}
+#drop .sm{color:var(--sub);font-size:12.5px;margin-top:6px;line-height:1.7}
+#drop input{display:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card h2 .sub{font-weight:400;color:var(--sub);font-size:12px;word-break:break-all}
+.card h2 .sp{flex:1}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;line-height:1.6;vertical-align:middle}
+.t-teal{background:var(--tealbg);color:var(--teal2)}.t-red{background:var(--redbg);color:var(--red)}.t-amber{background:var(--amberbg);color:var(--amber)}.t-gray{background:#eef0f3;color:#6b7280}
+.frame{width:100%;border:1px solid var(--line);border-radius:6px;background:#fff;display:block;min-height:120px}
+.point{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;margin:6px 0 10px;font-size:13.5px}
+.point .k{color:var(--amber);font-weight:700;font-size:12px}
+.point .v{margin:0 0 6px;white-space:pre-wrap;word-break:break-all}
+.point .v:last-child{margin-bottom:0}
+.note{color:var(--sub);font-size:12px;line-height:1.7}
+.note b{color:var(--ink)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 10px}
+.toolbar .sp{flex:1}
+#msg{margin:8px 0;font-size:13px}
+#msg.err{color:var(--red)}
+.kv{border-collapse:collapse;width:100%;font-size:13px}
+.kv th,.kv td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+.kv th{background:#f3f4f6;font-weight:600;color:#374151;width:34%;white-space:nowrap}
+.csv{border-collapse:collapse;font-size:12px;white-space:nowrap}
+.csv td{border:1px solid var(--line);padding:2px 6px}
+.tw{overflow:auto;max-height:60vh}
+.list{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.list a{border:1px solid var(--line);background:#fff;border-radius:20px;padding:3px 11px;font-size:12.5px;color:var(--ink);text-decoration:none}
+.list a:hover{background:#f3f4f6}
+.list a.red{border-color:#fca5a5;color:var(--red);font-weight:600}
+details.raw{margin-top:8px}
+details.raw summary{cursor:pointer;color:var(--sub);font-size:12px}
+details.raw pre{font-size:11.5px;background:#f9fafb;border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:300px;margin:6px 0 0}
+@media print{body *{visibility:hidden}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">公</div>
+    <div><h1>公文書ビューア</h1><div class="meta">e-Gov・日本年金機構の通知(XML＋XSL)を、zipのまま放り込むだけで表示・印刷/PDF保存</div></div>
+    <div class="sp"></div>
+    <button class="btn" id="btnAll" disabled>すべて印刷/PDF</button>
+    <button class="btn" id="btnClear" disabled>クリア</button>
+  </div>
+
+  <div id="drop">
+    <input type="file" id="file" multiple>
+    <div class="big">ここに「公文書_○○.zip」「通知_○○.zip」をドラッグ＆ドロップ（またはクリックして選択）</div>
+    <div class="sm">zipの中のzipも自動で開きます。xml / xsl / csv を直接入れてもOK。<b>ファイルはこのブラウザの中だけで処理され、どこにも送信されません。</b></div>
+  </div>
+  <div id="msg"></div>
+  <div id="nav" class="list"></div>
+  <div id="docs"></div>
+
+  <div class="card note" id="help">
+    <b>なぜ普通に開けないのか</b>：e-Govの公文書は「XML(中身)＋XSL(見た目)」の2ファイル構成で、ChromeやEdgeはPC内のXMLにXSLを当てる処理をセキュリティ上ブロックするため、真っ白か文字の羅列になります。このツールはブラウザの中でXSLを当てて本来の帳票の見た目に戻します。<br>
+    <b>PDFにするには</b>：各帳票の「印刷/PDF」→ 送信先「PDFに保存」。<b>すべて印刷/PDF</b>なら鑑・通知書・返戻票をまとめて1つのPDFにできます。<br>
+    <b>保存の目安</b>：PDFにしたら Drive の 4.大樹/01.業務管理 へ「日付_年金機構_届出名.pdf」で保存（元zipは削除してOK）。
+  </div>
+</div>
+
+<iframe id="printer" style="position:fixed;width:0;height:0;border:0;visibility:hidden" title="印刷用"></iframe>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let files=new Map();   // path -> {name,dir,bytes}
+let docs=[];           // rendered docs
+let seq=0;
+const FORCE_JS=new URLSearchParams(location.search).get('engine')==='js';
+
+/* ===== 取り込み ===== */
+$('drop').addEventListener('click',()=>$('file').click());
+$('file').addEventListener('change',e=>{ ingestFiles([...e.target.files]); e.target.value=''; });
+['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('over');}));
+['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('over');}));
+$('drop').addEventListener('drop',async e=>{
+  const items=[...(e.dataTransfer.items||[])];
+  const entries=items.map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+  if(entries.length){ const out=[]; for(const en of entries) await walkEntry(en,'',out); ingestFiles(out); }
+  else ingestFiles([...e.dataTransfer.files]);
+});
+document.addEventListener('paste',e=>{ const fs=[...(e.clipboardData?.files||[])]; if(fs.length) ingestFiles(fs); });
+function walkEntry(entry,prefix,out){
+  return new Promise(res=>{
+    if(entry.isFile) entry.file(f=>{ out.push({file:f,rel:prefix+f.name}); res(); },()=>res());
+    else if(entry.isDirectory){ const r=entry.createReader(); const all=[]; const read=()=>r.readEntries(async es=>{ if(!es.length){ for(const c of all) await walkEntry(c,prefix+entry.name+'/',out); res(); } else { all.push(...es); read(); } },()=>res()); read(); }
+    else res();
+  });
+}
+async function ingestFiles(list){
+  if(!list.length) return;
+  setMsg('読み込み中…');
+  try{
+    for(const it of list){
+      const f=it.file||it, rel=it.rel||f.name;
+      const bytes=new Uint8Array(await f.arrayBuffer());
+      await addBytes(rel,bytes);
+    }
+    await renderAll();
+  }catch(e){ console.error(e); setMsg('読み込みエラー: '+(e&&e.message||e),true); }
+}
+async function addBytes(path,bytes){
+  const low=path.toLowerCase();
+  if(low.endsWith('.zip')||(bytes[0]===0x50&&bytes[1]===0x4b&&bytes[2]===3&&bytes[3]===4)){
+    if(!window.JSZip) throw new Error('zip展開ライブラリ(JSZip)が読み込めていません。ネット接続を確認して再読み込みしてください');
+    const zip=await JSZip.loadAsync(bytes,{decodeFileName:decodeZipName});
+    const base=path.replace(/\.zip$/i,'')+'/';
+    for(const [n,ent] of Object.entries(zip.files)){
+      if(ent.dir) continue;
+      const b=await ent.async('uint8array');
+      await addBytes(base+n,b);
+    }
+    return;
+  }
+  const name=path.split('/').pop(); const dir=path.slice(0,path.length-name.length);
+  files.set(path,{path,name,dir,bytes});
+}
+function decodeZipName(b){ try{ return new TextDecoder('utf-8',{fatal:true}).decode(b); }catch(e){ try{ return new TextDecoder('shift_jis').decode(b); }catch(e2){ return String.fromCharCode(...b); } } }
+function decodeText(bytes,hint){
+  let enc=hint||'utf-8';
+  if(!hint){ const head=new TextDecoder('latin1').decode(bytes.subarray(0,200)); const m=/encoding=["']([\w-]+)["']/i.exec(head); if(m) enc=m[1]; }
+  try{ return new TextDecoder(enc).decode(bytes); }catch(e){ return new TextDecoder('utf-8').decode(bytes); }
+}
+function setMsg(t,err){ $('msg').textContent=t||''; $('msg').className=err?'err':''; }
+
+/* ===== 変換・描画 ===== */
+async function renderAll(){
+  const xmls=[...files.values()].filter(f=>/\.xml$/i.test(f.name));
+  const csvs=[...files.values()].filter(f=>/\.csv$/i.test(f.name));
+  const others=[...files.values()].filter(f=>!/\.(xml|xsl|xslt|csv)$/i.test(f.name));
+  if(!xmls.length&&!csvs.length&&!others.length){ setMsg('表示できるファイル(xml/csv)が見つかりません',true); return; }
+  $('docs').innerHTML=''; $('nav').innerHTML=''; docs=[];
+  // 並び: 鑑(DOC) → 返戻票 → その他の通知書 → csv → その他
+  const rank=f=>{ const t=decodeText(f.bytes).slice(0,400); if(/<DOC\b/.test(t)) return 0; if(/返戻/.test(t)) return 1; return 2; };
+  xmls.sort((a,b)=>rank(a)-rank(b)||a.path.localeCompare(b.path,'ja'));
+  for(const f of xmls){ try{ await renderXml(f); }catch(e){ console.error(e); addCard(f,'変換エラー',`<div class="tag t-red">エラー</div> ${esc(e&&e.message||e)}<details class="raw"><summary>XMLの中身</summary><pre>${esc(decodeText(f.bytes))}</pre></details>`); } }
+  for(const f of csvs) renderCsv(f);
+  for(const f of others){
+    const isPdf=/\.pdf$/i.test(f.name);
+    const blob=new Blob([f.bytes],{type:isPdf?'application/pdf':'application/octet-stream'}); const u=URL.createObjectURL(blob);
+    addCard(f,f.name,isPdf?`<iframe class="frame" style="height:70vh" src="${u}"></iframe>`:`<a class="btn" href="${u}" download="${esc(f.name)}">ダウンロード ${esc(f.name)}</a>`);
+  }
+  $('btnAll').disabled=!docs.some(d=>d.html); $('btnClear').disabled=false;
+  setMsg(`${xmls.length}件のXML${csvs.length?`・${csvs.length}件のCSV`:''}を表示しました`);
+  $('help').open=false;
+}
+function findXsl(f,xmlText){
+  let href=null;
+  const pi=/<\?xml-stylesheet[^>]*href=["']([^"']+)["']/i.exec(xmlText); if(pi) href=pi[1];
+  if(!href){ const st=/<STYLESHEET[^>]*URI=["']([^"']+)["']/i.exec(xmlText)||/<STYLESHEET>([^<]+)<\/STYLESHEET>/i.exec(xmlText); if(st) href=st[1]; }
+  if(!href) return null;
+  const nm=href.split('/').pop();
+  return files.get(f.dir+nm)||files.get(f.dir+href)||[...files.values()].find(x=>x.name===nm)||null;
+}
+async function transform(xmlText,xslText){
+  const dp=new DOMParser();
+  const xmlDoc=dp.parseFromString(xmlText,'application/xml');
+  if(xmlDoc.getElementsByTagName('parsererror').length) throw new Error('XMLの解析に失敗: '+xmlDoc.getElementsByTagName('parsererror')[0].textContent.slice(0,200));
+  if(window.XSLTProcessor&&!FORCE_JS){
+    const xslDoc=dp.parseFromString(xslText,'application/xml');
+    if(xslDoc.getElementsByTagName('parsererror').length) throw new Error('XSLの解析に失敗');
+    const p=new XSLTProcessor(); p.importStylesheet(xslDoc);
+    const out=p.transformToDocument(xmlDoc);
+    if(!out) throw new Error('XSL変換に失敗しました');
+    return out.documentElement ? (out instanceof HTMLDocument ? out.documentElement.outerHTML : new XMLSerializer().serializeToString(out)) : '';
+  }
+  // ブラウザにXSLT機能が無い場合(Chromeの将来版など)は純JS実装で代替
+  const mod=await import('https://cdn.jsdelivr.net/npm/xslt-processor@5.1.2/+esm');
+  const xslt=new mod.Xslt(); const parser=new mod.XmlParser();
+  return await xslt.xsltProcess(parser.xmlParse(xmlText),parser.xmlParse(xslText));
+}
+function cleanHtml(html,f){
+  const d=new DOMParser().parseFromString(html,'text/html');
+  d.querySelectorAll('script,meta[http-equiv]').forEach(n=>n.remove());
+  // 同梱ファイルへのリンクは全部この画面に並べて表示するので、リンクは文字にする
+  d.querySelectorAll('a[href]').forEach(a=>{ const h=a.getAttribute('href')||''; if(/^https?:/i.test(h)){ a.target='_blank'; a.rel='noopener'; } else { const s=d.createElement('span'); s.textContent=a.textContent; a.replaceWith(s); } });
+  const st=d.createElement('style'); st.textContent='html,body{background:#fff;margin:0}body{padding:14px 16px;font-family:"MS PGothic","Meiryo UI","Yu Gothic",sans-serif}@media print{body{padding:0}}';
+  (d.head||d.documentElement).prepend(st);
+  const mc=d.createElement('meta'); mc.setAttribute('charset','utf-8'); (d.head||d.documentElement).prepend(mc);
+  const title=(d.title||'').trim();
+  return {html:'<!DOCTYPE html>'+d.documentElement.outerHTML,title,bodyHtml:d.body?d.body.innerHTML:'',styles:[...d.querySelectorAll('style')].map(s=>s.textContent).join('\n')};
+}
+async function renderXml(f){
+  const xmlText=decodeText(f.bytes);
+  const xsl=findXsl(f,xmlText);
+  const points=extractPoints(xmlText);
+  let c=null;
+  if(xsl){
+    try{ const html=await transform(xmlText,decodeText(xsl.bytes)); c=cleanHtml(html,f); if(!c.bodyHtml.trim()||/[<>]/.test(c.title)) c=null; }
+    catch(e){ console.warn('XSL変換失敗→項目一覧で表示',f.path,e); c=null; }
+  }
+  if(c){
+    const title=(c.title&&!/[<>]/.test(c.title)?c.title:'')||formTitle(xmlText)||guessTitle(xmlText)||f.name;
+    const id='d'+(++seq);
+    const isHenrei=/返戻/.test(title)||/<_?返戻票/.test(xmlText);
+    const card=addCard(f,title,`
+      <div class="toolbar"><span class="tag ${isHenrei?'t-red':'t-teal'}">${isHenrei?'返戻(差し戻し)':'帳票'}</span><span class="note">XSL: ${esc(xsl.name)}</span><div class="sp"></div><button class="btn pri" data-print="${id}">印刷/PDF</button><button class="btn" data-open="${id}">別タブで開く</button></div>
+      ${pointsHtml(points)}
+      <iframe class="frame" id="${id}" title="${esc(title)}"></iframe>`,id,isHenrei);
+    const fr=card.querySelector('iframe'); fr.srcdoc=c.html;
+    fr.addEventListener('load',()=>fitFrame(fr));
+    docs.push({id,title,html:c.html,bodyHtml:c.bodyHtml,styles:c.styles,f});
+  }else{
+    const title=formTitle(xmlText)||guessTitle(xmlText)||f.name;
+    addCard(f,title,`<div class="toolbar"><span class="tag t-amber">${xsl?'XSL変換できず(項目一覧で表示)':'XSLなし(項目一覧で表示)'}</span></div>${pointsHtml(points)}${kvTable(xmlText)}<details class="raw"><summary>XMLの中身</summary><pre>${esc(xmlText)}</pre></details>`);
+  }
+}
+function formTitle(xmlText){ if(/<DataRoot[\s>]/.test(xmlText)) return '申請書の控え（e-Gov提出様式）'; return ''; }
+function guessTitle(xmlText){
+  const m=/<(?:APPTITLE|TITLE|帳票タイトル|帳票名称)>(?:<!\[CDATA\[)?([^<\]]+)/.exec(xmlText); if(m) return m[1].trim();
+  const r=/<([^\s?!>\/][^\s>\/]*)/g; let x; while((x=r.exec(xmlText))){ if(!/^xml/i.test(x[1])) return x[1].replace(/^_/,''); } return '';
+}
+function leafFields(xmlText){
+  const d=new DOMParser().parseFromString(xmlText,'application/xml'); const out=[];
+  const walk=n=>{ for(const c of n.children){ if(c.children.length) walk(c); else { const v=(c.textContent||'').trim(); if(v&&!/非表示/.test(c.tagName)&&!/非表示項目/.test(v)) out.push([c.tagName,v]); } } };
+  if(d.documentElement) walk(d.documentElement); return out;
+}
+function extractPoints(xmlText){
+  const want=/^(帳票タイトル|届書名|理由|通信欄|再提出期限|返戻元名称|返戻元問合せ先電話番号|照会番号|機構からのお知らせ|被保険者漢字氏名|資格喪失原因)$/;
+  return leafFields(xmlText).filter(([k])=>want.test(k));
+}
+function pointsHtml(points){
+  if(!points.length) return '';
+  return `<div class="point"><div class="k">要点(XMLから抜粋)</div>${points.map(([k,v])=>`<div class="v"><b>${esc(k)}</b>：${esc(v)}</div>`).join('')}</div>`;
+}
+function kvTable(xmlText){
+  const rows=leafFields(xmlText); if(!rows.length) return '<div class="note">表示できる項目がありません</div>';
+  return `<div class="tw"><table class="kv">${rows.map(([k,v])=>`<tr><th>${esc(k.replace(/_/g,' '))}</th><td>${esc(v)}</td></tr>`).join('')}</table></div>`;
+}
+function renderCsv(f){
+  let t; try{ t=new TextDecoder('utf-8',{fatal:true}).decode(f.bytes); }catch(e){ t=new TextDecoder('shift_jis').decode(f.bytes); }
+  const rows=t.split(/\r?\n/).filter(r=>r.trim()!=='').map(r=>r.split(','));
+  addCard(f,f.name+'（届書データCSV）',`<div class="toolbar"><span class="tag t-gray">CSV</span><span class="note">e-Govへ提出した届書の元データ（列名なし）</span></div><div class="tw"><table class="csv">${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`);
+}
+function addCard(f,title,inner,id,red){
+  const el=document.createElement('div'); el.className='card'; if(id) el.dataset.for=id;
+  const anchor='c'+(++seq); el.id=anchor;
+  el.innerHTML=`<h2>${esc(title)}<span class="sub">${esc(f.path)}</span></h2>${inner}`;
+  $('docs').appendChild(el);
+  const a=document.createElement('a'); a.href='#'+anchor; a.textContent=title; if(red) a.className='red'; $('nav').appendChild(a);
+  return el;
+}
+function fitFrame(fr){
+  try{ const d=fr.contentDocument; fr.style.height='10px'; const h=Math.max(d.documentElement.scrollHeight,d.body?d.body.scrollHeight:0); fr.style.height=Math.min(Math.max(h+24,120),20000)+'px'; }catch(e){ fr.style.height='70vh'; }
+}
+let rt=null; window.addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>document.querySelectorAll('iframe.frame').forEach(fitFrame),200); });
+
+/* ===== 印刷 ===== */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.print){ const fr=$(b.dataset.print); try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(err){ printHtml(docs.find(d=>d.id===b.dataset.print).html); } }
+  if(b.dataset.open){ const d=docs.find(x=>x.id===b.dataset.open); const u=URL.createObjectURL(new Blob([d.html],{type:'text/html'})); window.open(u,'_blank'); }
+});
+$('btnAll').addEventListener('click',()=>{
+  const ds=docs.filter(d=>d.html); if(!ds.length) return;
+  const html='<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>公文書 まとめ印刷</title><style>body{margin:0;font-family:"MS PGothic","Meiryo UI","Yu Gothic",sans-serif}section.pg{padding:14px 16px;page-break-after:always}section.pg:last-child{page-break-after:auto}@media print{section.pg{padding:0}}</style>'+ds.map(d=>'<style>'+scopeCss(d.styles,'#'+d.id)+'</style>').join('')+'</head><body>'+ds.map(d=>`<section class="pg" id="${d.id}">${d.bodyHtml}</section>`).join('')+'</body></html>';
+  printHtml(html);
+});
+function scopeCss(css,scope){
+  // 各帳票のスタイルが混ざらないよう、セレクタの頭に帳票IDを付ける(簡易)
+  return css.replace(/<!--[\s\S]*?-->/g,'').replace(/(^|\})\s*([^{}]+)\{/g,(m,pre,sel)=>{ if(/^\s*@/.test(sel)) return m; return pre+sel.split(',').map(s=>{ s=s.trim(); if(!s) return s; return /^(html|body)\b/i.test(s)?scope:scope+' '+s; }).join(',')+'{'; });
+}
+function printHtml(html){
+  const fr=$('printer'); fr.srcdoc=html;
+  fr.onload=()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ const u=URL.createObjectURL(new Blob([html],{type:'text/html'})); window.open(u,'_blank'); } };
+}
+$('btnClear').addEventListener('click',()=>{ files=new Map(); docs=[]; $('docs').innerHTML=''; $('nav').innerHTML=''; $('btnAll').disabled=true; $('btnClear').disabled=true; setMsg(''); });
+
+/* ===== URLから読み込み(?src=zipのURL) ===== */
+(async()=>{
+  const src=new URLSearchParams(location.search).get('src'); if(!src) return;
+  try{ setMsg('取得中… '+src); const r=await fetch(src); if(!r.ok) throw new Error('HTTP '+r.status); const b=new Uint8Array(await r.arrayBuffer()); await new Promise(res=>{ const t=()=>window.JSZip?res():setTimeout(t,50); t(); }); await addBytes(src.split('/').pop().split('?')[0]||'file.zip',b); await renderAll(); }
+  catch(e){ setMsg('URLからの取得に失敗: '+(e&&e.message||e),true); }
+})();
+if(!window.XSLTProcessor||FORCE_JS) setMsg('このブラウザにはXSL変換機能がありません。純JS版で変換します(表示が少し崩れる場合があります)');
+</script>
+</body>
+</html>
